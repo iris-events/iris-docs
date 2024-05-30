@@ -1,0 +1,72 @@
+= RabbitMQ
+
+This document builds on the high-level informative document about event-driven architecture. +
+This is a normative document for usage and operation of RabbitMQ.
+
+== Current use cases
+
+Our queue messaging solution works with AWS with SQS and SNS.
+
+SQS is a queue solution and SNS is notification service that delivers messages to multiple queues.
+
+== Message flows
+
+* To a queue - When publishing messages to a queue only a single subscriber can consume that message. Transport is entirely handled by SQS. (**Direct**)
+
+* To a topic - A message (or an event) is published to a topic and delivered to a multiple queues subscribed to it. Transport is done first by SNS and then zero or more SQS queues. (**Fanout**)
+
+== RabbitMQ transport mechanisms
+
+RMQ uses a two component solution analogous to SNS and SQS, where every message is published to an exchange that delivers it to individual queues.
+
+=== Queue mechanics
+
+Every message delivered to a queue gets consumed once by a single subscriber, meaning if multiple subscribers are consuming messages from a queue, only a one of them will see a given message.
+
+=== Exchange mechanics
+
+Publishers in RMQ don’t publish messages directly to queues, but rather to _exchanges_ that then route messages to _queues_ based on rules determined by the exchange type and queue configuration.
+
+==== Types
+
+* Direct - Messages get delivered directly to a queue based on the routing key, https://www.rabbitmq.com/tutorials/amqp-concepts.html#exchange-direct[docs]
+
+** if no exchange is specified the messages are delivered directly to a queue with the same name as the routing key.
+
+** If an exchange is specified, message is delivered to all queues subscribed to a routing key.
+
+* Fanout - Messages are published to an exchange and delivered to all queues subscribed to it. https://www.rabbitmq.com/tutorials/amqp-concepts.html#exchange-fanout[Docs]
+
+* Topics - Topic exchanges route messages to one or many queues based on matching between a message routing key and the pattern that was used to bind a queue to an exchange. https://www.rabbitmq.com/tutorials/amqp-concepts.html#exchange-topic[docs]
+
+* Header - A headers exchange is designed for routing on multiple attributes that are more easily expressed as message headers than a routing key. Headers exchanges ignore the routing key attribute. Instead, the attributes used for routing are taken from the headers attribute. https://www.rabbitmq.com/tutorials/amqp-concepts.html#exchange-headers[Docs]
+
+RMQ enables very sophisticated routing of messages, but of the purposes of an alternative to our existing use cases, the _direct_ exchanges and fanout exchanges are sufficient.
+
+== Current base infrastructure
+
+=== Exchanges
+
+|===
+|*Name* |*Type* |*Durable* |*Auto delete* 
+
+|error |topic |true |false 
+|retry |direct |true |false 
+|dead.dead-letter |topic |true |false 
+|frontend |topic |true |false 
+|session |topic |true |false 
+|user |topic |true |false 
+|broadcast |topic |true |false 
+|subscription |topic |true |false 
+|===
+
+== Queues
+
+|===
+|*Name* |*Durable* |*Exclusive* |*Auto delete* |*Arguments* 
+
+|error |true |false |false | 
+|retry |true |false |false |`x-message-ttl: 5000` 
+|dead.dead-letter |true |false |false | 
+|subscription |true |false |false | 
+|===

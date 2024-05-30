@@ -1,0 +1,153 @@
+= Subscription service
+
+Subscription service is responsible for holding and managing of user sessions mappings to observed resources - subscriptions.
+
+== Subscribable resources
+
+Resources which are commonly updated an are usually observed by the client while expecting an update are qualified to become *_subscribable resources_*.
+
+=== Snapshot
+
+When client is subscribed to the resource a snapshot of that resource must be sent if resource provides snapshot functionality. For example a user resource should have snapshot (current user state) while price ticker does not necessarily have it - service can either send current price or just starts emitting updates. Snapshot availability must be agreed between involved parties (client dev and service backend dev teams) prior providing subscription for a resource.
+
+== Subscribing to a resource updates
+
+=== Manual (client) subscription
+
+Client will subscribe to the resource/s with `subscribe` event:
+
+[code, json]
+----
+{
+  "event": "subscribe",
+  "clientTraceId":"<clientTraceId>",
+  "payload": {
+    "resources": \[
+      {
+        "resourceType": "<resource-type",
+        "resourceId": "<resource-id>"
+      },
+      {
+        "resourceType": "<resource-type",
+        "resourceId": "<resource-id>"
+      },
+      ...
+    \]
+  }
+}
+----
+
+User and/or session id is retrieved from message headers.
+
+=== Client subscription flow
+
+image:./attachments/Manual%20subscription%20flow.drawio.png[]
+
+As seen in the picture, as soon as subscription is processed by `iris-subscription` service the user is able to get resource updates.
+
+== Automatic (backend) subscription
+
+Backend can subscribe client to the resource automatically when certain resource related action is triggered. Typical case is consent flow when client obviously wants to be notified of future consent updates.
+
+Automatic subscribe event payload:
+
+[code, json]
+----
+{
+  "resourceType": "<resource-type",
+  "resourceId": "<resource-id>",
+  "scope": "<USER/SESSION>",
+  "state": {
+    // initial resource state
+  }
+}
+----
+
+User and/or session id is retrieved from message headers.
+
+=== Automatic subscription flow
+
+image:./attachments/Untitled%20Diagram.drawio.png[]
+
+If web-socket connection is lost after 1.6. and the same resource should be observed by the client, the backend service must provide handler for `subscribed` event as in manual client subscription flow.
+
+This will not be always necessary since client will be able to simply request new resource in some cases.
+
+image:https://global-id.atlassian.net/wiki/images/icons/grey_arrow_down.png[]Click here to expand…
+
+image:./attachments/consent%20flow.drawio.png[]
+
+== Subscribed message
+
+When client is successfully subscribed the subscription service needs to inform it with `subscribed` message. This message must be sent regardless of manual or automatic subscription.
+
+Message payload:
+
+----
+{
+  "event": "subscribed",
+  "clientTraceId": "optionally-some-unique-id",
+  "resourceType": "transaction",
+  "resourceId": "<some-transaction-id>",
+  "payloadType": "CONFIRMATION"
+  "payload": {
+  }
+}
+----
+
+== Unsubscribing from a resource
+
+Client must unsubscribe from each resource independently with `unsubscribe` message:
+
+----
+{
+  "event": "unsubscribe",
+  "clientTraceId":"<clientTraceId>",
+  "payload": {
+    "resources": \[
+      {
+        "resourceType": "<resource-type",
+        "resourceId": "<resource-id>"
+      }
+    \]
+  }
+}
+----
+
+== Subscriptions manager
+
+The heart of subscription service is subscriptions manager which holds all currently active subscriptions and must support the following operations:
+
+* subscription to resource updates
+
+* unsubscribe from resource updates
+
+* handling resource messages (updates and snapshots)
+
+* client disconnect
+
+* batch subscribe
+
+=== Subscribe
+
+When subscription occurs, manager should save a mapping from resource type and resource id to a client session or userId. Subscriptions are for the time being only present in memory.
+
+=== Unsubscribe
+
+Manager should be able to remove subscription based on resource type and id.
+
+=== Resource message handling
+
+Manager will receive huge amount of messages related to resources. Not all will have active subscriptions and manager should discard those. For those which mappings to client session or user are found it must build a message and pipeline it to the router through `session` or `user` exchange - depending of the subscription type.
+
+=== Client disconnect
+
+When client disconnects from web-socket the router detects that and must inform subscription service about that. Subscription service should unsubscribe that session from all active subscriptions.
+
+If user still has any other sessions active and any active user level subscriptions are present, those should remain intact.
+
+=== Batch subscribe
+
+Manager should be able to handle “batch subscriptions”. This will be newly introduced frontend message which will contain a list of all resource types and ids for each type on which client would like to subscribe.
+
+The purpose is to use this message when client experiences a short web-socket disconnect. When this will happen the client will be given new session id and old subscriptions won’t work anymore. Also, a cleanup job will remove them since router will detect disconnect (described under previous operation).

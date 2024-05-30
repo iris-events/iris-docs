@@ -1,0 +1,111 @@
+= Iris: event-driven architecture
+
+EDA is an architectural paradigm that focuses around events that change the distributed state of the system, rather than strict synchronous resource APIs.
+
+The main benefit is that it enables loose coupling of services as, services are not addressing each other directly anymore, but publish and listen to events on a queue.
+
+This architectural style is also referred to as _reactive programming_ or _reactive systems._
+
+== Reactive manifesto
+
+
+https://www.reactivemanifesto.org/
+
+Excerpt from the reactive manifesto.
+
+____
+
+Systems built as Reactive Systems are more flexible, loosely-coupled and https://www.reactivemanifesto.org/glossary#Scalability[scalable]. This makes them easier to develop and amenable to change. They are significantly more tolerant of failure and when https://www.reactivemanifesto.org/glossary#Failure[failure] does occur they meet it with elegance rather than disaster. Reactive Systems are highly responsive, giving https://www.reactivemanifesto.org/glossary#User[users] effective interactive feedback.
+
+*Reactive Systems are:*
+
+*Responsive:* The https://www.reactivemanifesto.org/glossary#System[system] responds in a timely manner if at all possible. Responsiveness is the cornerstone of usability and utility, but more than that, responsiveness means that problems may be detected quickly and dealt with effectively. Responsive systems focus on providing rapid and consistent response times, establishing reliable upper bounds so they deliver a consistent quality of service. This consistent behaviour in turn simplifies error handling, builds end user confidence, and encourages further interaction.
+
+*Resilient:* The system stays responsive in the face of https://www.reactivemanifesto.org/glossary#Failure[failure]. This applies not only to highly-available, mission-critical systems — any system that is not resilient will be unresponsive after a failure. Resilience is achieved by https://www.reactivemanifesto.org/glossary#Replication[replication], containment, https://www.reactivemanifesto.org/glossary#Isolation[isolation] and https://www.reactivemanifesto.org/glossary#Delegation[delegation]. Failures are contained within each https://www.reactivemanifesto.org/glossary#Component[component], isolating components from each other and thereby ensuring that parts of the system can fail and recover without compromising the system as a whole. Recovery of each component is delegated to another (external) component and high-availability is ensured by replication where necessary. The client of a component is not burdened with handling its failures.
+
+*Elastic:* The system stays responsive under varying workload. Reactive Systems can react to changes in the input rate by increasing or decreasing the https://www.reactivemanifesto.org/glossary#Resource[resources] allocated to service these inputs. This implies designs that have no contention points or central bottlenecks, resulting in the ability to shard or replicate components and distribute inputs among them. Reactive Systems support predictive, as well as Reactive, scaling algorithms by providing relevant live performance measures. They achieve https://www.reactivemanifesto.org/glossary#Elasticity[elasticity] in a cost-effective way on commodity hardware and software platforms.
+
+*Message Driven:* Reactive Systems rely on https://www.reactivemanifesto.org/glossary#Asynchronous[asynchronous] https://www.reactivemanifesto.org/glossary#Message-Driven[message-passing] to establish a boundary between components that ensures loose coupling, isolation and https://www.reactivemanifesto.org/glossary#Location-Transparency[location transparency]. This boundary also provides the means to delegate https://www.reactivemanifesto.org/glossary#Failure[failures] as messages. Employing explicit message-passing enables load management, elasticity, and flow control by shaping and monitoring the message queues in the system and applying https://www.reactivemanifesto.org/glossary#Back-Pressure[back-pressure] when necessary. Location transparent messaging as a means of communication makes it possible for the management of failure to work with the same constructs and semantics across a cluster or within a single host. https://www.reactivemanifesto.org/glossary#Non-Blocking[Non-blocking] communication allows recipients to only consume https://www.reactivemanifesto.org/glossary#Resource[resources] while active, leading to less system overhead.
+
+____
+
+== Async API
+
+____
+
+All developers, architects, and product managers are used to REST APIs and the synchronous paradigm of communication. You make a request and wait for the response. This is exactly how the web works. You enter a URL (e.g., http://google.com[google.com]) in the address bar of your favorite browser and it sends a request to the server. Following, the server sends the response with the content of the website. **The web is the greatest implementation of a REST API.**
+
+However, there are certain situations when you don't really need a response from the server. At least no other than the confirmation the request has been received. This is also called *"fire and forget"*, and it's really useful when you just want to communicate or inform that "something happened". You're not requesting or asking for anything, thus you don't need a response. Examples of this are:
+
+- A user just signed up. +
+- You have a new follower. +
+- Your fridge is getting empty.
+
+Along with the event, you may also want to send *extra information*. For instance:
+
+- A user just signed up: here's the user information (e.g., name, email, age, etc.) +
+- You have a new follower: here are the details of the follower (e.g., username, name, picture, etc.) +
+- Your fridge is getting empty: here's the percentage of "emptiness" (e.g., 23%)
+
+This extra information is often referred to as *event payload* or *message payload*.
+
+*Core concepts*
+
+____
+
+image:https://www.asyncapi.com/img/diagrams/simple-event-driven.png[]
+
+____
+
+In most cases, Event-Driven Architectures (EDAs) are broker-centric, like in the diagram above. You can find some new concepts in it, so let's go through them now.
+
+*Message broker*
+
+A message broker (or *"broker"*) is a piece of infrastructure in charge of receiving messages and delivering them to those who have shown interest. They often store messages until they are delivered, what makes EDAs very resilient to failures. Examples of brokers are https://rabbitmq.com/[RabbitMQ], http://kafka.apache.org/[Apache Kafka], http://solace.com/[Solace], etc.
+
+*Publisher/Subscriber*
+
+A publisher (a.k.a. *producer*) is an application that sends messages to the *broker*.
+
+A subscriber (a.k.a. *consumer*) is an application that connects to the *broker*, manifests an interest in a certain type of messages, and leaves the connection open so the *broker* can push messages to them.
+
+*Message*
+
+A message is a piece of information that's sent by the publishers to the broker, and received by all the interested subscribers. The content of the message can be anything, but they are frequently catalogued as *events* and *commands*. As you saw above, *events* communicate a fact that occurred. Instead, *commands* are very much like *requests* in REST APIs: they tell the subscribers "do this".
+
+*Technically speaking,* ***events*** **and** ***commands*** **are the same. The only difference is in their semantics.**
+
+*Channels*
+
+One detail that might pass unnoticed from the diagram above is the existence of *channels*. All the *brokers* support communication through multiple channels. The industry doesn't have a common term though so you may find them as *topics*, *routing keys*, *event types*, and probably other ones I'm missing.
+
+They're usually assigned a name or identifier (e.g., `user_signed_up`) and it's often a good practice to send a single type of message through them. Think about TV or radio channels: the BBC only broadcasts its information through an assigned channel. If the broadcasters (publishers) didn't respect that rule you (the subscriber) would only see and hear interferences.
+
+____
+
+== Goals
+
+An https://www.asyncapi.com/[AsyncAPI] specification exists that is complementary to the OpenAPI spec we already use for describing our API interfaces. Our goal is to describe our queue interfaces the same way we describe our REST ones with AsyncAPI.
+
+Async API does a great job at describing the high level interfaces and core concepts of asynchronous event communication.
+
+== Technical solution
+
+The solution we want to use in the background is still being evaluated, but we are most likely to go with RabbitMQ.
+
+== Declarative queue interfaces
+
+Our queue event handlers should be configured declaratively just like our HTTP controllers. +
+The declarations should exist for subscriber controllers and publisher functions. Declarations should compile into an AsyncAPI spec.
+
+== Resources
+
+https://martinfowler.com/articles/201701-event-driven.html
+
+https://docs.aws.amazon.com/whitepapers/latest/microservices-on-aws/asynchronous-communication-and-lightweight-messaging.html
+
+https://medium.com/@aamermail/asynchronous-communication-in-microservices-14d301b9016
+
+https://aws.amazon.com/event-driven-architecture/
+
+https://www.reactivemanifesto.org/

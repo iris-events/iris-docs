@@ -1,0 +1,380 @@
+= Developer integration guide (Java)
+
+The following guide will provide you with all required information to start using our event driven architecture (Iris) within your service.
+
+== Table of contents
+:toc: macro
+
+== Dependencies
+
+=== Microservice parent pom
+
+In order to have things always updated and build the same on all java services we use maven parent pom structure.
+
+Change your pom parent as follows:
+
+[source,xml]
+----
+  <parent>
+    <groupId>id.global</groupId>
+    <artifactId>microservice-parent</artifactId>
+    <version>7.3</version>
+    <relativePath />
+  </parent>
+
+----
+
+Latest released version can be found in `id/global/microservice-parent` folder under `maven-internal` within our https://repository.internal.globalid.dev/#browse/browse:maven-internal:id%2Fglobal%2Fmicroservice-parent[nexus repository].
+
+When using our parent pom you can get rid of all dependency management, build and profile customization (except if you need some additional customization).
+
+== Event messaging Quarkus extension
+
+Event messaging extension is the key part of the EDA which enables consuming and sending messages from/to your service.
+
+[source ,xml]
+----
+<dependency>
+     <groupId>org.iris-events</groupId>
+    <artifactId>quarkus-iris</artifactId>
+    <version>6.1.2</version>
+</dependency>
+
+----
+
+Latest released version can be found in maven central
+
+=== Connection to RabbitMq
+
+In order to connect to RabbitMq to consume Iris messages you need to configure your client. Set the following config properties:
+
+----
+rabbitmq-host=
+rabbitmq-protocol= #amqp or amqps
+rabbitmq-username=
+rabbitmq-password=
+
+----
+
+== Importing another service’s models
+
+When service is using Iris it will automatically (through CI/CD) generate AsyncAPI document and publish it to our https://schema.tools.global.id/ui/artifacts[Apicurio server]. This doc is later on used by generator which produces Java and npm packages available for use.
+
+If service is using default settings the packaged models will be available within `id.global.iris` group and artifact build from service name and `-models` suffix. For example directory service models package should look like this:
+
+[source, xml]
+----
+<dependency>
+  <groupId>org.iris-events.iris</groupId>
+  <artifactId>directory-models</artifactId>
+  <version>1.1.1</version>
+</dependency>
+
+----
+
+
+== Iris common library (already part of quarkus-iris)
+
+Iris common is the essential part of every backend service and most likely you already have dependency to this maven artifact. From the EDA perspective it is required since it contains the annotations used for marking messages and message handlers.
+
+[source, xml]
+----
+<dependency>
+    <groupId>id.global.iris</groupId>
+    <artifactId>iris-common</artifactId>
+    <version>${version.iris}</version>
+</dependency>
+
+----
+
+
+
+== Asyncapi schema generator maven plugin (already set in microservice-parent)
+
+In order to generate Asyncapi schema of messages consumed by your service, schema generator maven plugin must be properly configured within plugins build section of the `pom.xml` file.
+
+[source,xml]
+----
+<plugin>
+    <groupId>org.iris-events</groupId>
+    <artifactId>asyncapi-schema-generator-maven-plugin</artifactId>
+    <version>${version.iris}</version>
+    <executions>
+        <execution>
+            <goals>
+                <goal>generate-schema</goal>
+            </goals>
+        </execution>
+    </executions>
+    <configuration>
+        <scanDependenciesDisable>true</scanDependenciesDisable>
+        <annotationsArtifacts>
+            <annotationsArtifact>id.global.common:globalid-common</annotationsArtifact>
+        </annotationsArtifacts>
+        <excludeFromSchemas>
+            com.fasterxml.jackson.databind.JsonNode,java.util.Map
+        </excludeFromSchemas>
+    </configuration>
+</plugin>
+
+----
+
+Latest released version can be found in `id/global/events/asyncapi-schema-generator-maven-plugin` folder under `maven-internal` within our https://repository.internal.globalid.dev/#browse/browse:maven-releases:id%2Fglobal%2Fevents%2Fasyncapi-schema-generator-maven-plugin[nexus repository].
+
+*The following settings must be configured:*
+
+* `annotationsArtifacts` will tell the plugin where it should look for annotations used within the service. This is before mentioned `globalid-common` artifact.
+
+* `scanDependenciesDisable` should be disabled in order to prevent scanning for annotations defined within your depending services. In some cases it comes handy, but for most common setup you should have it disabled.
+
+* `exudeFromSchemas` should contain list of fully qualified classes which you don’t want the generator to process and describe. Those will appear in the schema as objects rather than detailed breakdown of its internals. Usually those are recursive data structures (as is `JsonNode`) or maps containing objects.
+
+=== Wrapping it together
+
+It is recommended that you use properties to set values for repeated entries and version numbers. Therefor you should end with an outline as follows:
+
+Example pom.xml
+[source,xml]
+----
+<project>
+    <groupId>id.global.demo</groupId>
+    <artifactId>demo-service</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <properties>
+        <version.globalid.common>1.0.20</version.globalid.common>
+        <version.globalid.event-messaging>1.2.0</version.globalid.event-messaging>
+        <!-- plugin dependencies -->
+        <asyncapi-schema-generator-maven-plugin.version>1.1.0</asyncapi-schema-generator-maven-plugin.version>
+        <!-- variables -->
+        <group-id.globalid.common>id.global.common</group-id.globalid.common>
+        <artifact-id.globalid.common>globalid-common</artifact-id.globalid.common>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>${group-id.globalid.common}</groupId>
+            <artifactId>${artifact-id.globalid.common}</artifactId>
+            <version>${version.globalid.common}</version>
+        </dependency>
+        <dependency>
+            <groupId>id.global.events</groupId>
+            <artifactId>event-messaging</artifactId>
+            <version>${version.globalid.event-messaging}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>id.global.events</groupId>
+                <artifactId>asyncapi-schema-generator-maven-plugin</artifactId>
+                <version>${asyncapi-schema-generator-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>generate-schema</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <scanDependenciesDisable>true</scanDependenciesDisable>
+                    <annotationsArtifacts>
+                        <annotationsArtifact>${group-id.globalid.common}:${artifact-id.globalid.common}</annotationsArtifact>
+                    </annotationsArtifacts>
+                    <excludeFromSchemas>
+                        com.fasterxml.jackson.databind.JsonNode,java.util.Map
+                    </excludeFromSchemas>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+----
+
+== Message annotations
+
+=== @Message
+
+Fully qualified name: `org.iris_events.annotations.Message`
+
+Every message which is consumed by the service should be annotated with `@Message` annotation. This will enable schema generator to process and describe the message within asyncapi schema used for model generation.
+
+==== Properties
+
+|===
+| |*default value* |*description* 
+
+|*name** | |Defines the exchange (and possibly routingKey) for this message. 
+|*exchangeType* |FANOUT |Type of RabbitMQ exchange (https://www.rabbitmq.com/tutorials/amqp-concepts.html#exchange-fanout[FANOUT], https://www.rabbitmq.com/tutorials/amqp-concepts.html#exchange-topic[TOPIC], https://www.rabbitmq.com/tutorials/amqp-concepts.html#exchange-direct[DIRECT]) 
+|*routingKey* |{name} |Routing key under which this message is sent to the exchange. Value of `name` property is used if not set. 
+|*scope* |INTERNAL |Scope of the message (INTERNAL, FRONTEND, SESSION, USER, BROADCAST). 
+|*rolesAllowed* |[] |RBAC roles which should be able to produce this message. However we do not enforce this and is only used for documentation, therefore can be left default. 
+|*ttl* |-1 |Time to live of the message. When expires, message will not get delivered if not yet consumed. 
+|*deadLetter* |dead-letter |Used to define dead letter exchange and queue names. By default all dead messages are sent to the same exchange and queue using value of the `name` property for routing key.<br><br>Whatever is set here will still get prefixed by `dead.`. 
+|===
+
+* required
+
+=== @MessageHandler
+
+Fully qualified name: `org.iris_events.annotations.MessageHandler`
+
+==== Properties
+
+Although many properties are available in most scenarios default values will be sufficient. The most important property is `rolesAllowed` which drives Role Based Access Control.
+
+|===
+| |*default value* |*description* 
+
+|*bindingKeys* |[] |List of binding keys from which the consumer will consume messages. By default, nothing needs to be set, since EDA extension set the value in regard to the `name` property of the `@Message` annotated class.<br><br>For messages traversing through *DIRECT* type exchanges this should be 1:1 with `routingKey` on the `@Message` annotated class. The list should contain only one value. <br>For messages traversing through *FANOUT* type exchanges this parameter does nothing and should not be defined. <br>For messages traversing through *TOPIC* type exchanges this parameter can contain a list of values with wildcards. For more information see https://www.rabbitmq.com/tutorials/tutorial-five-java.html[RabbitMQ topics].
+|*durable* |true |Defines whether the queue through which the message will be consumed should be durable or not. 
+|*autoDelete* |false |Defines whether the queue is deleted when there are no active consumers. 
+|*rolesAllowed* |[] |Defines users based on RBAC roles which are allowed to send message handled by this handler.<br><br>All roles are defined in `id.global.common.auth.jwt.Role` enum defined in `globalid-common` artifact.<br><br>Most used role is `AUTHENTICATED` which will allow to consume messages sent only by authenticated users. 
+|*perInstance* |false |Defines consumer per service instance, in case there are multiple replicas/pods of the same service running, setting this flag to true would create dedicated queue for each service instance. Meaning each instance will get all the messages rather than compete for them.<br><br>If this is set to true, `autoDelete` is enforced to prevent leftover queues. 
+|*prefetchCount* |1 |Defines how many messages are fetched at once. 
+|===
+
+== Authentication and authorization
+
+Initial websocket authentication is done on the router by posting subscribe event containing auth token within the payload. When this is done, router will trigger authorization sequence with our keycloak oauth server and attach signed and encrypted Json Web Token (JWT) to each message forwarded to the backend within `x-jwt` message header.
+
+Additionally `identity/authenticated` internal message will be emitted to all our backend services. Services can react on this event and prepare data for authenticated client.
+
+Event messaging Quarkus extension contains all required implementation to support Json Web Token authorization for message handlers with `rollesAllowed` specified.
+
+In order to successfully validate the token, service should have access to environments public key certificate.
+
+== Configure public key
+
+Public key should be available in the Kubernetes (k8s) namespace where service is running (it is already present in all our main namespaces).
+
+Key is represented by k8s secret named `jwt-public-key` containing public key of the GlobaliD certificate used to sign JWT. In order to use this public key the certificate must be mounted to a k8s volume.
+
+The following configuration will mount the key represented by `jwt-public-key` k8s secret to the selected volume mount of the running application node:
+
+----
+\# set key location and issuer
+mp.jwt.verify.publickey.location=/opt/secret-volume/publicKey.pem
+mp.jwt.verify.issuer=https://global.id/
+
+# specify secret-volume mount
+quarkus.kubernetes.mounts.uphold-secret-volume.path=/opt/secret-volume
+
+# mount public key secret to specified secret-volume
+quarkus.kubernetes.secret-volumes.uphold-secret-volume.secret-name=jwt-public-key
+quarkus.kubernetes.secret-volumes.uphold-secret-volume.default-mode=440
+----
+
+== Reference implementation (demo)
+
+There are two demo application which can be used as a implementation reference.
+
+== eda-demo
+
+This is a simple standalone implementation of backend service which can consume a message and reply to another queue as a response without JWT authorization.
+
+Repository: https://github.com/globalid/iris-demo
+
+== Web shop
+
+Web shop is a simple application build of 3 microservices and a websocket router accompanied with hydra oauth server.
+
+You can run all by yourselves on local stack. But to play around it is advised connecting to RabbitMq on `dev` environment and introduce some new messages to avoid competing with deployed services.
+
+Development environment RabbitMQ connection details:
+
+----
+url: example]
+username: `eda-demo`
+password: `bjuTXzvkSdSgwxTG`
+----
+
+=== Web shop services
+
+==== Inventory
+
+Repository: https://github.com/globalid/iris-demo-inventory
+
+Language: Java
+
+==== Order
+
+Repository: https://github.com/globalid/iris-demo-order
+
+Language: Java
+
+==== Shipping
+
+Repository: https://github.com/globalid/iris-demo-shipping-node
+
+Language: Node.js
+
+=== Connecting to websocket router
+
+url: `wss://api.globalid.dev/v0/websocket`
+
+==== Example using wscat:
+
+----
+$ wscat -c wss://api.globalid.dev/v0/websocket
+----
+
+=== Sample messages
+
+[source, jsonlines]
+----
+{"event":"inventory-stock-inquiry", "payload":{}}
+
+// requires authenticated websocket
+{"event":"inventory-stock-inquiry-auth", "payload":{}}
+
+// always throwing client exception
+{"event":"inventory-stock-inquiry-client-exception", "payload":{}}
+
+// always throwing server exception (retrying and notifying a client)
+{"event":"inventory-stock-inquiry-server-exception", "payload":{}}
+
+// always throwing server exception (retrying and not notifying a client)
+{"event":"inventory-stock-inquiry-silent-server-exception", "payload":{}}
+
+{"event":"stock-update-subscribe", "payload":{"items":["lemons"]}}
+
+{"event":"order", "payload":{"orderedItems":{"lemons":5,"pineapples":2}}}
+
+{"event":"order-inquiry", "payload":{"orderId":"590f618d-47ea-4b52-a584-b48238227401"}}
+
+{"event":"shipping-inquiry","payload":{"shippingId":"972885d1-2d88-4905-9e96-5d37718b343e"}}
+
+{"event":"shipment-delivered","payload":{"shippingId":"899191ec-4111-4d40-b815-34e6b475fba2"}}
+
+{"event":"system-status","payload":{}}
+----
+
+To test authentication and authorization use secure web socket connection and subscribe to router using subscribe event providing your authorization token:
+
+[source,json]
+----
+{"event": "subscribe", "payload": {"token": "your-auth-token"}}
+----
+
+To test secure endpoint you can use the following event:
+
+----
+{"event":"inventory-stock-inquiry-auth", "payload":{}}
+----
+
+Each of the above messages can be equipped with client trace id (`clientTraceId`). Id answer to you message is expected it will contain that same client trace id.
+
+e.g.:
+
+`{&quot;event&quot;:&quot;inventory-stock-inquiry&quot;, &quot;clientTraceId&quot;:&quot;some-unique-id&quot;, &quot;payload&quot;:{}}`
+
+== Wiring Iris EDA with HTTP Request
+
+During client transition to Iris using websocket we could encounter situations where request to the backend is still made through classic HTTP but target backend service will already communicate with other backend services using Iris.
+
+In such cases we need to hold client request open while sending AMQP messages to other services and collecting async AMQP response messages.
+
+Mechanism to support such behavior is not part of Iris because we do not want to promote this approach and should be only used temporary during transition period.
+
+However you can see reference code for achieving this in the <<Web-shop,*Order service of the Web shop*>> demo. Follow the `placeOrder` rest endpoint code declared within `OrderResource`. The relevant bits are implemented within `RpcAmqpProducer`.

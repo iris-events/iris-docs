@@ -1,0 +1,66 @@
+= Messages and Schema Registry
+
+The purpose of the schema registry is to decouple message schemas from producers and consumers, while having a central location to track all schemas.
+
+The registry will consist of a single AsyncAPI document, which defines message queues/topics, producers and consumers, and message schemas.
+
+== Message format
+
+Every message is wrapped in an object with metadata config to help with easier developer integration.
+
+----
+MESSAGE WRAPPER
+messageWrapper: MessageWrapper<T> {
+  @config: MessageMetaData,
+  payload: T,
+}
+----
+
+=== Meta-data
+
+Message metadata is used in every message, and defines where the message is published in the background. Meta data also defines the queue/exchange/routing, as an idempotent configuration. Meaning when the metadata is defined for the first time it creates the queue/exchange. Each additional consumer/producer needs to use the same configuration.
+
+The purpose of metadata is to simplify the queue interface where we only have a single entry point with queues.
+
+The exact format of metadata should be defined as we better integrate with RabbitMQ.
+
+=== Message Payload
+
+The payload is specific for each message.
+
+== Message schemas
+
+AsyncAPI message schemas are in the JSON-Schema format, which is generic, language agnostic, and widely used. +
+https://json-schema.org/implementations.html
+
+Using an AsyncAPI document enables any service in any language to download the specification and operate on the schemas.
+
+=== Operations
+
+Example POC for generating types
+
+https://gitlab.com/globalid/experiments/schema-repository-types-generator
+
+==== Extracting JSON Schemas
+
+AsyncAPI is written in YAML, so it needs to be parsed and each schema outputted as a standalone file for processing. For JSON-Schemas, we have many tools to create types for any language we want.
+
+==== Generating TypeScript Type Definitions
+
+https://www.npmjs.com/package/json-schema-to-typescript
+
+Schemas can be converted into typescript type definitions and published to NPM as a private package.
+
+==== Generating POJOs
+
+https://github.com/joelittlejohn/jsonschema2pojo
+
+This tool enables us to create POJOs from a directory of JSON Schemas. The created objects should be in a java package in our maven repository.
+
+== Future
+
+In the future we want to improve our pipeline to generate publisher and consumer client code for all our language stacks.
+
+AsyncAPI provides a generator framework, where you can create custom templates for generating codehttps://github.com/asyncapi/generator
+
+We should build our code generator stack on this framework, currently templates already exists, but their use is very niche.

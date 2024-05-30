@@ -1,0 +1,46 @@
+= Web Socket client integration best practices
+
+This page sums up common practices when integrating client with backend over web socket.
+Since infrastructure by it’s own cannot enforce the details, they must be agreed end to end between backend service and client.
+
+== Retrieving scrollable or paginated resources
+
+=== Scrollable resources - infinite scroll
+
+When backend must provide client with resources without defined amount of them or when the resources count is always growing, so called “infinite scroll” is the usual approach to present them on the client side.
+
+To build a view, backend must react to some predefined events:
+
+* `resource_list_(of_certain_type_)selected` +
+This event will inform the backend that user clicked on a certain list of resources.
+In case of a chat, that event would most likely be `chat_opened`.
+As a payload of the event, client can inform the backend of possible additional filters to be applied on the resources. +
+Additionally backend can subscribe the client to the updates of the list (if new items are added, they can be automatically pushed to the client).
+
+* `resource_list_(of_certain_type_)scrolled_down/up` +
+This event will inform the backend that user is scrolling down or up, and depending on the possible filters, order direction and type of resource, the backend will send event with additional list of events.
+Client must also provide information (identifier) of the last item on the edge which he already have.
+Size of the list, can be either predefined or part of the payload itself. +
+For better use experience, the size can be also combined with the swipe speed.
+The faster the user is scrolling, more data can be send back to the client.
+In such cases, backend can automatically emit several next views in smaller chunks to deliver them faster.
+However this must be agreed and supported beforehand for each such resource list. +
+Such event is usually triggered by the client prior hitting the end of current list.
+For example, if initial list contained 100 items, this event would be triggered before scrollbar hits the edge (e.g. as soon as user scrolls past item 60 or 80. +
+Client must present the loader for certain amount of time when the edge is reached (preferably without hiding or blocking the already loaded list - similar to “swipe down to refresh”).
+
+=== Paginated resources
+
+To present the paginated resources, the approach is similar to scrollable resources with the following events:
+
+* `resource_list_(of_certain_type)selected` +
+This event inform the backend that user clicked on a certain (usually final) list of resources.
+As a response, backend will send the event with the items to fill the first page and additional information about total items available.
+With data returned, client is able to render pagination component. +
+As an additional payload, client can tell the preferred page size and additional filters when data can be filtered.
+
+* `resource_list_(of_certain_type)_next/previous_page_selected` +
+This event will inform the backend about user initiating to view next (or previous) page.
+As a response, client will send the event with the items which fit to the next page, regarding the filters and paging information provided through the event payload. +
+When client is awaiting event with items for next page, it is up to the design whether to show a loader and block current screen.
+However, if event does not arrive in time, certain amount of retries should be triggered and finally user should be presented with and error.
