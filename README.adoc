@@ -1,0 +1,37 @@
+= Iris Event driven architecture
+
+
+== Why EDA
+
+include::event-driven-architecture.adoc
+
+== Quarkus extension
+
+https://github.com/iris-events/iris
+
+include::quarkus-extension.adoc
+
+== NestJS module
+
+https://github.com/iris-events/nest-iris
+
+== Async API
+
+https://www.asyncapi.com
+
+== Messages and Schema Registry
+
+include::messages-and-schema-registry.adoc
+include::rabbitmq.adoc
+
+== Web Socket
+
+include::guide-ws-client.adoc
+include::web-socket-best-practices.adoc
+include::subscription-service.adoc
+
+== RPC events
+
+include::rpc.adoc
+
+
