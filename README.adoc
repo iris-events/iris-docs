@@ -1,15 +1,24 @@
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
 = Iris Event driven architecture
 
 
 == Why EDA
 
-include::event-driven-architecture.adoc
+
+link:./event-driven-architecture.adoc[]
 
 == Quarkus extension
 
 https://github.com/iris-events/iris
 
-include::quarkus-extension.adoc
+link:./quarkus-extension.adoc[]
 
 == NestJS module
 
@@ -21,17 +30,20 @@ https://www.asyncapi.com
 
 == Messages and Schema Registry
 
-include::messages-and-schema-registry.adoc
-include::rabbitmq.adoc
+link:./messages-and-schema-registry.adoc[]
+
+link:./rabbitmq.adoc[]
 
 == Web Socket
 
-include::guide-ws-client.adoc
-include::web-socket-best-practices.adoc
-include::subscription-service.adoc
+link:./guide-ws-client.adoc[]
+
+link:./web-socket-best-practices.adoc[]
+
+link:./subscription-service.adoc[]
 
 == RPC events
 
-include::rpc.adoc
+link:./rpc.adoc[]
 
 
